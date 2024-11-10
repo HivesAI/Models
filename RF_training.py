@@ -12,7 +12,7 @@ from sklearn.metrics import r2_score, mean_squared_error
 import seaborn as sns
 
 #Data path
-data_path = './data/Full_Features_Trentino.csv'
+data_path = './data/Full_data_Trentino.csv'
 
 #Loading data
 data = pd.read_csv(data_path)
@@ -52,9 +52,6 @@ for taxon in taxa:
     #Target feature -> pollen concentration of the following week (->  -7-days lagged taxa concentration)
     data[f'{taxon}_target'] = data[taxon].shift(-7)
     data.dropna(subset=[f'{taxon}_target'], inplace=True)
-    
-    X = data[features] #Input features
-    y = data[f'{taxon}_target'] #Target features
     
     #Ensuring time series consistency for the splits by filtering dates
     train_data = data[data['year'] <= 2021]  #Training on data up to 2021
@@ -100,3 +97,11 @@ for taxon in taxa:
     plt.ylabel("Predicted Concentration")
     plt.title(f"Predicted vs Actual for {taxon}")
     plt.show()
+
+    fig, ax = plt.subplots(1, figsize=(10,6))
+    ax.plot(test_data['datetime'], y_test, color='green', label='real')
+    ax.plot(test_data['datetime'], y_pred, color='red', label='predicted') 
+    ax.grid()  
+    fig.legend() 
+    plt.show() 
+    plt.close(fig) 
