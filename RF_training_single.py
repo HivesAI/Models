@@ -27,7 +27,7 @@ data['day'] = data['datetime'].dt.dayofyear
 
 #Taxa concentrations
 taxa = [
-    'Ambrosia', 'Artemisia', 'Betula', 'Corylus', 'Cupressaceae, Taxaceae', 
+    'Ambrosia', 'Artemisia', 'Betula', 'Corylus', 'Cupressaceae, Taxaceae',
     'Fraxinus', 'Olea europaea', 'Ostrya carpinifolia', 'Poaceae', 'Urticaceae'
 ]
 
@@ -38,20 +38,27 @@ meteo_features = ['temp_max', 'temp_min', 'temp_mean', 'precipitation']
 
 #Defining the different time windows (1/2 weeks, 1/3/6 months)
 time_windows = {
-    '1w': 7, 
-    '2w': 14, 
-    '1m': 30, 
-    '3m': 90, 
+    '1w': 7,
+    '2w': 14,
+    '1m': 30,
+    '3m': 90,
     '6m': 180
 }
+
+
+new_features = {}
 
 #Creating rolling mean and variance features for each feature in the given time windows
 for feature in taxa + meteo_features:
     for window_name, window_size in time_windows.items():
         #Rolling mean
-        data[f'{feature}_rolling_mean_{window_name}'] = (data[feature].rolling(window=window_size, min_periods=1).mean())
+        new_features[f'{feature}_rolling_mean_{window_name}'] = (data[feature].rolling(window=window_size, min_periods=1).mean())
         #Rolling variance
-        data[f'{feature}_rolling_var_{window_name}'] = data[feature].rolling(window=window_size, min_periods=1).var()
+        new_features[f'{feature}_rolling_var_{window_name}'] = data[feature].rolling(window=window_size, min_periods=1).var()
+
+
+rolling_features_df = pd.DataFrame(new_features)
+data = pd.concat([data, rolling_features_df], axis=1)
 
 #Dropping possible existing rows with NaN values created by shifts and rolling sums
 data.dropna(inplace=True)
@@ -68,11 +75,11 @@ for taxon in taxa:
     tw_size = 7
 
     data[f'{taxon}_target_{tw_name}'] = (data[taxon].shift(-7).rolling(window=tw_size, min_periods=1).mean())
-    
+
     #Ensuring time series consistency for the splits by filtering dates
     train_data = data[data['year'] <= 2015] #Training on data up to 2015
     test_data = data[data['year'] >= 2016 and data['year'] <= 2020] #Testing on 2016-2020 data
-    
+
     X_train = train_data[features]
     y_train = train_data[f'{taxon}_target_{tw_name}']
     X_test = test_data[features]
@@ -80,7 +87,7 @@ for taxon in taxa:
 
     # Initialize TimeSeriesSplit, keeping consistent splits
     tscv = TimeSeriesSplit(n_splits=5)
-    
+
     #Parameters grid used to look for the most fitting max_depth parameter
     param_grid = {
         'max_depth': [2, 3, 5, 10, 12, None],
@@ -97,7 +104,7 @@ for taxon in taxa:
     mse = mean_squared_error(y_test, y_pred)
     print(f"Taxon: {taxon}")
     print(f"Tuned R² Score: {r2:.4f}") #Higher is better; measure of how well the model explains variance in the test data
-    print(f"Tuned Mean Squared Error: {mse:.4f}\n") #Lower is better; Average squared difference between predicted and actual values 
+    print(f"Tuned Mean Squared Error: {mse:.4f}\n") #Lower is better; Average squared difference between predicted and actual values
 
     #Showing each feature importance for future feature tuning/adjustments
     feature_importances = best_rf.feature_importances_
@@ -116,8 +123,8 @@ for taxon in taxa:
 
     fig, ax = plt.subplots(1, figsize=(10,6))
     ax.plot(test_data['datetime'], y_test, color='green', label='Actual')
-    ax.plot(test_data['datetime'], y_pred, color='red', label='Predicted') 
-    ax.grid()  
-    fig.legend() 
-    plt.show() 
-    plt.close(fig) 
+    ax.plot(test_data['datetime'], y_pred, color='red', label='Predicted')
+    ax.grid()
+    fig.legend()
+    plt.show()
+    plt.close(fig)
