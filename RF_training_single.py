@@ -46,12 +46,18 @@ time_windows = {
 }
 
 #Creating rolling mean and variance features for each feature in the given time windows
+new_features = {}
+
 for feature in taxa + meteo_features:
     for window_name, window_size in time_windows.items():
         #Rolling mean
-        data[f'{feature}_rolling_mean_{window_name}'] = (data[feature].rolling(window=window_size, min_periods=1).mean())
+        new_features[f'{feature}_rolling_mean_{window_name}'] = data[feature].rolling(window=window_size, min_periods=1).mean()
         #Rolling variance
-        data[f'{feature}_rolling_var_{window_name}'] = data[feature].rolling(window=window_size, min_periods=1).var()
+        new_features[f'{feature}_rolling_var_{window_name}'] = data[feature].rolling(window=window_size, min_periods=1).var()
+
+new_features_df = pd.DataFrame(new_features)
+
+data = pd.concat([data, new_features_df], axis=1)
 
 #Dropping possible existing rows with NaN values created by shifts and rolling sums
 data.dropna(inplace=True)
@@ -61,24 +67,24 @@ data.dropna(inplace=True)
 for taxon in taxa:
     #Defining the final feature set to use
     #Here, we still use year, month and day as feature -> TRY TO NOT INCLUDE THEM AND COMPARE THE RESULTS
-    features = ['year', 'month', 'day', 'temp_max', 'temp_min', 'temp_mean', 'precipitation'] + [f'{taxon}_rolling_mean{window_name}' for window_name in time_windows] + [f'{taxon}_rolling_var{window_name}' for window_name in time_windows] + [f'{feature}_rolling_mean_{window_name}' for feature in meteo_features for window_name in time_windows] + [f'{feature}_rolling_var_{window_name}' for feature in meteo_features for window_name in time_windows]
+    features = ['year', 'month', 'day', 'temp_max', 'temp_min', 'temp_mean', 'precipitation'] + [f'{taxon}_rolling_mean_{window_name}' for window_name in time_windows] + [f'{taxon}_rolling_var_{window_name}' for window_name in time_windows] + [f'{feature}_rolling_mean_{window_name}' for feature in meteo_features for window_name in time_windows] + [f'{feature}_rolling_var_{window_name}' for feature in meteo_features for window_name in time_windows]
 
     #Target feature -> rolling mean for the next time window (CHANGE VALUES BELOW TO CHANGE TIME WINDOW)
     tw_name = '1w' #PREDICTING ONE WEEK AHEAD
     tw_size = 7
 
-    data[f'{taxon}_target_{tw_name}'] = (data[taxon].shift(-7).rolling(window=tw_size, min_periods=1).mean())
+    data[f'{taxon}_target_{tw_name}'] = (data[taxon].shift(-tw_size).rolling(window=tw_size, min_periods=1).mean())
     
     #Ensuring time series consistency for the splits by filtering dates
     train_data = data[data['year'] <= 2015] #Training on data up to 2015
-    test_data = data[data['year'] >= 2016 and data['year'] <= 2020] #Testing on 2016-2020 data
+    test_data = data[(data['year'] >= 2016) & (data['year'] <= 2020)] #Testing on 2016-2020 data
     
     X_train = train_data[features]
     y_train = train_data[f'{taxon}_target_{tw_name}']
     X_test = test_data[features]
     y_test = test_data[f'{taxon}_target_{tw_name}']
 
-    # Initialize TimeSeriesSplit, keeping consistent splits
+    #Initializing TimeSeriesSplit, keeping consistent splits
     tscv = TimeSeriesSplit(n_splits=5)
     
     #Parameters grid used to look for the most fitting max_depth parameter
@@ -88,7 +94,7 @@ for taxon in taxa:
 
     #Number of trees set at 500
     rf = RandomForestRegressor(n_estimators=500)
-    rf_random = RandomizedSearchCV(estimator=rf, param_distributions=param_grid, n_iter=10, cv=tscv, verbose=2, n_jobs=-1)
+    rf_random = RandomizedSearchCV(estimator=rf, param_distributions=param_grid, n_iter=6, cv=tscv, verbose=2, n_jobs=-1)
     rf_random.fit(X_train, y_train)
     best_rf = rf_random.best_estimator_
 
