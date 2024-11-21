@@ -1,6 +1,7 @@
 #THIS CODE AIMS TO TRAIN A RANDOM FOREST ON EACH TAXON WITHOUT HAVING OTHER TAXON CONCENTRATIONS AS INPUT FEATURES
 #LOOK INTO "RF_training_ALL.py" FOR RF TRAINING ON EACH TAXON WHILE HAVING OTHER TAXON CONCENTRATIONS AS INPUT FEATURES
 
+import os
 #Libraries for data processing
 import numpy as np
 import pandas as pd
@@ -14,6 +15,10 @@ from sklearn.model_selection import TimeSeriesSplit, RandomizedSearchCV
 from sklearn.metrics import r2_score, mean_squared_error
 import seaborn as sns
 
+#Directory to store results 
+plots_dir = 'Plots_single_species_training'
+os.makedirs(plots_dir,exist_ok=True)
+
 #Data path
 data_path = './data/Full_data_Trentino.csv'
 
@@ -25,15 +30,17 @@ data['year'] = data['datetime'].dt.year
 data['month'] = data['datetime'].dt.month
 data['day'] = data['datetime'].dt.dayofyear
 
-#Taxa concentrations
-taxa = [
-    'Ambrosia', 'Artemisia', 'Betula', 'Corylus', 'Cupressaceae, Taxaceae',
-    'Fraxinus', 'Olea europaea', 'Ostrya carpinifolia', 'Poaceae', 'Urticaceae'
-]
+data.drop('datetime', axis=1, inplace=True)
 
-#Meteorological features
-meteo_features = ['temp_max', 'temp_min', 'temp_mean', 'precipitation']
+data.replace('--', np.nan, inplace=True)
+data.ffill(inplace=True)
 
+# Defining features and taxa
+time_features = ['year', 'month', 'day']
+taxa = [col for col in (data.columns) if col[0].isupper()]  # Features starting with an uppercase letter
+meteo_features = [col for col in data.columns if col not in time_features and col[0].islower()]  # Features starting with a lowercase letter
+print("Taxa Features:", taxa)
+print("Meteorological Features:", meteo_features)
 #Defining new input Features
 
 #Defining the different time windows (1/2 weeks, 1/3/6 months)
@@ -70,13 +77,13 @@ data.dropna(inplace=True)
 for taxon in taxa:
     #Defining the final feature set to use
     #Here, we still use year, month and day as feature -> TRY TO NOT INCLUDE THEM AND COMPARE THE RESULTS
-    features = ['year', 'month', 'day', 'temp_max', 'temp_min', 'temp_mean', 'precipitation'] + [f'{taxon}_rolling_mean_{window_name}' for window_name in time_windows] + [f'{taxon}_rolling_var_{window_name}' for window_name in time_windows] + [f'{feature}_rolling_mean_{window_name}' for feature in meteo_features for window_name in time_windows] + [f'{feature}_rolling_var_{window_name}' for feature in meteo_features for window_name in time_windows]
-
+    features = time_features + meteo_features + [f'{taxon}_rolling_mean_{window_name}' for window_name in time_windows] + [f'{taxon}_rolling_var_{window_name}' for window_name in time_windows] + [f'{feature}_rolling_mean_{window_name}' for feature in meteo_features for window_name in time_windows] + [f'{feature}_rolling_var_{window_name}' for feature in meteo_features for window_name in time_windows]
+   
     #Target feature -> rolling mean for the next time window (CHANGE VALUES BELOW TO CHANGE TIME WINDOW)
     tw_name = '1w' #PREDICTING ONE WEEK AHEAD
     tw_size = 7
 
-    data[f'{taxon}_target_{tw_name}'] = (data[taxon].shift(-tw_size).rolling(window=tw_size, min_periods=1).mean())
+    data[f'{taxon}_target_{tw_name}'] = (data[taxon].shift(-7).rolling(window=tw_size, min_periods=1).mean())
 
     #Ensuring time series consistency for the splits by filtering dates
     train_data = data[data['year'] <= 2015] #Training on data up to 2015
@@ -112,8 +119,7 @@ for taxon in taxa:
     feature_importances = best_rf.feature_importances_
     sns.barplot(x=feature_importances, y=features)
     plt.title(f"Feature Importance for {taxon}")
-    plt.show()
-
+    plt.savefig(f'{plots_dir}/{taxon}_feature_importance')
     #Results visualization
     plt.figure(figsize=(10, 6))
     plt.scatter(y_test, y_pred, alpha=0.3)
@@ -121,12 +127,12 @@ for taxon in taxa:
     plt.xlabel("Actual Rolling Mean of Concentration")
     plt.ylabel("Predicted Rolling Mean of Concentration")
     plt.title(f"Predicted vs Actual for {taxon}")
-    plt.show()
+    plt.savefig(f'{plots_dir}/{taxon}_predicted_vs_actual')
 
     fig, ax = plt.subplots(1, figsize=(10,6))
     ax.plot(test_data['datetime'], y_test, color='green', label='Actual')
     ax.plot(test_data['datetime'], y_pred, color='red', label='Predicted')
     ax.grid()
     fig.legend()
-    plt.show()
+    plt.savefig(f'{plots_dir}/{taxon}_results')
     plt.close(fig)
