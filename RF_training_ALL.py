@@ -29,7 +29,6 @@ data['datetime'] = pd.to_datetime(data['datetime'])
 data['year'] = data['datetime'].dt.year
 data['month'] = data['datetime'].dt.month
 data['day'] = data['datetime'].dt.dayofyear
-data.drop('datetime', axis=1, inplace=True)
 
 data.replace('--', np.nan, inplace=True)
 data.ffill(inplace=True)
@@ -37,7 +36,7 @@ data.ffill(inplace=True)
 # Defining features and taxa
 time_features = ['year', 'month', 'day']
 taxa = [col for col in (data.columns) if col[0].isupper()]  # Features starting with an uppercase letter
-meteo_features = [col for col in data.columns if col not in time_features and col[0].islower()]  # Features starting with a lowercase letter
+meteo_features = [col for col in data.columns if col not in time_features and col not in 'datetime' and col[0].islower()]  # Features starting with a lowercase letter
 print("Taxa Features:", taxa)
 print("Meteorological Features:", meteo_features)
 

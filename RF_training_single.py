@@ -30,7 +30,6 @@ data['year'] = data['datetime'].dt.year
 data['month'] = data['datetime'].dt.month
 data['day'] = data['datetime'].dt.dayofyear
 
-data.drop('datetime', axis=1, inplace=True)
 
 data.replace('--', np.nan, inplace=True)
 data.ffill(inplace=True)
@@ -38,7 +37,7 @@ data.ffill(inplace=True)
 # Defining features and taxa
 time_features = ['year', 'month', 'day']
 taxa = [col for col in (data.columns) if col[0].isupper()]  # Features starting with an uppercase letter
-meteo_features = [col for col in data.columns if col not in time_features and col[0].islower()]  # Features starting with a lowercase letter
+meteo_features = [col for col in data.columns if col not in time_features and col not in 'datetime' and col[0].islower()]  # Features starting with a lowercase letter
 print("Taxa Features:", taxa)
 print("Meteorological Features:", meteo_features)
 #Defining new input Features
@@ -80,7 +79,7 @@ for taxon in taxa:
     #Defining the final feature set to use
     #Here, we still use year, month and day as feature -> TRY TO NOT INCLUDE THEM AND COMPARE THE RESULTS
     features = time_features + meteo_features + [f'{taxon}_rolling_mean_{window_name}' for window_name in time_windows] + [f'{taxon}_rolling_var_{window_name}' for window_name in time_windows] + [f'{feature}_rolling_mean_{window_name}' for feature in meteo_features for window_name in time_windows] + [f'{feature}_rolling_var_{window_name}' for feature in meteo_features for window_name in time_windows]
-   
+    
     #Target feature -> rolling mean for the next time window (CHANGE VALUES BELOW TO CHANGE TIME WINDOW)
     tw_name = '1w' #PREDICTING ONE WEEK AHEAD
     tw_size = 7
@@ -98,7 +97,7 @@ for taxon in taxa:
     y_test = test_data[f'{taxon}_target_{tw_name}']
 
     #Initializing TimeSeriesSplit, keeping consistent splits
-    tscv = TimeSeriesSplit(n_splits=8)
+    tscv = TimeSeriesSplit(n_splits=5)
 
     #Parameters grid used to look for the most fitting max_depth parameter
     param_grid = {
