@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 #Libraries for model training and validation
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import TimeSeriesSplit, RandomizedSearchCV
+from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 from sklearn.metrics import r2_score, mean_squared_error
 import seaborn as sns
 
@@ -52,7 +52,9 @@ time_windows = {
     '6m': 180
 }
 
-
+# Replace all '--' occurrences with previous day values
+data.replace('--', np.nan, inplace=True)
+data.ffill(inplace=True)
 
 #Creating rolling mean and variance features for each feature in the given time windows
 new_features = {}
@@ -60,7 +62,6 @@ new_features = {}
 for feature in taxa + meteo_features:
     for window_name, window_size in time_windows.items():
         #Rolling mean
-
         new_features[f'{feature}_rolling_mean_{window_name}'] = data[feature].rolling(window=window_size, min_periods=1).mean()
         #Rolling variance
         new_features[f'{feature}_rolling_var_{window_name}'] = data[feature].rolling(window=window_size, min_periods=1).var()
@@ -71,6 +72,7 @@ data = pd.concat([data, new_features_df], axis=1)
 
 #Dropping possible existing rows with NaN values created by shifts and rolling sums
 data.dropna(inplace=True)
+
 
 #Random Forests training and tuning
 #Training a RF for each pollen type
@@ -83,7 +85,8 @@ for taxon in taxa:
     tw_name = '1w' #PREDICTING ONE WEEK AHEAD
     tw_size = 7
 
-    data[f'{taxon}_target_{tw_name}'] = (data[taxon].shift(-7).rolling(window=tw_size, min_periods=1).mean())
+    # center=False means that the center is the rightmost element of the window
+    data[f'{taxon}_target_{tw_name}'] = (data[taxon].shift(-tw_size).rolling(window=tw_size, min_periods=1, center=False, closed='right').mean())
 
     #Ensuring time series consistency for the splits by filtering dates
     train_data = data[data['year'] <= 2015] #Training on data up to 2015
@@ -95,16 +98,17 @@ for taxon in taxa:
     y_test = test_data[f'{taxon}_target_{tw_name}']
 
     #Initializing TimeSeriesSplit, keeping consistent splits
-    tscv = TimeSeriesSplit(n_splits=5)
+    tscv = TimeSeriesSplit(n_splits=8)
 
     #Parameters grid used to look for the most fitting max_depth parameter
     param_grid = {
-        'max_depth': [2, 3, 5, 10, 12, None],
+        # 'max_depth': [2, 3, 4, 5, 7, 10, 12, None],
+        'max_depth': [7],
     }
 
     #Number of trees set at 500
     rf = RandomForestRegressor(n_estimators=500)
-    rf_random = RandomizedSearchCV(estimator=rf, param_distributions=param_grid, n_iter=6, cv=tscv, verbose=2, n_jobs=-1)
+    rf_random = GridSearchCV(estimator=rf, param_grid=param_grid, cv=tscv, verbose=2, n_jobs=-1)
     rf_random.fit(X_train, y_train)
     best_rf = rf_random.best_estimator_
 
