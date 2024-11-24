@@ -1,6 +1,7 @@
 #THIS CODE AIMS TO TRAIN A RANDOM FOREST ON EACH TAXON WHILE HAVING OTHER TAXON CONCENTRATIONS AS INPUT FEATURES
 #LOOK INTO "RF_training_single.py" FOR RF TRAINING ON EACH TAXON WITHOUT HAVING OTHER TAXON CONCENTRATIONS AS INPUT FEATURES
 
+import os
 #Libraries for data processing
 import numpy as np
 import pandas as pd
@@ -14,6 +15,10 @@ from sklearn.model_selection import TimeSeriesSplit, RandomizedSearchCV
 from sklearn.metrics import r2_score, mean_squared_error
 import seaborn as sns
 
+#Directory to store results 
+plots_dir = 'Plots_all_species_training'
+os.makedirs(plots_dir,exist_ok=True)
+
 #Data path
 data_path = './data/Full_data_Trentino.csv'
 
@@ -25,14 +30,16 @@ data['year'] = data['datetime'].dt.year
 data['month'] = data['datetime'].dt.month
 data['day'] = data['datetime'].dt.dayofyear
 
-#Taxa concentrations
-taxa = [
-    'Ambrosia', 'Artemisia', 'Betula', 'Corylus', 'Cupressaceae, Taxaceae',
-    'Fraxinus', 'Olea europaea', 'Ostrya carpinifolia', 'Poaceae', 'Urticaceae'
-]
+data.replace('--', np.nan, inplace=True)
+data.ffill(inplace=True)
 
-#Meteorological features
-meteo_features = ['temp_max', 'temp_min', 'temp_mean', 'precipitation']
+# Defining features and taxa
+time_features = ['year', 'month', 'day']
+taxa = [col for col in (data.columns) if col[0].isupper()]  # Features starting with an uppercase letter
+meteo_features = [col for col in data.columns if col not in time_features and col not in 'datetime' and col[0].islower()]  # Features starting with a lowercase letter
+print("Taxa Features:", taxa)
+print("Meteorological Features:", meteo_features)
+
 
 #Defining new input Features
 
@@ -64,7 +71,7 @@ data.dropna(inplace=True)
 
 #Defining the final feature set to use
 #Here, we still use year, month and day as feature -> TRY TO NOT INCLUDE THEM AND COMPARE THE RESULTS
-features = ['year', 'month', 'day', 'temp_max', 'temp_min', 'temp_mean', 'precipitation'] + [f'{taxon}_rolling_mean_{window_name}' for taxon in taxa for window_name in time_windows] + [f'{taxon}_rolling_var_{window_name}' for taxon in taxa for window_name in time_windows] + [f'{feature}_rolling_mean_{window_name}' for feature in meteo_features for window_name in time_windows] + [f'{feature}_rolling_var_{window_name}' for feature in meteo_features for window_name in time_windows]
+features = time_features + meteo_features + [f'{taxon}_rolling_mean_{window_name}' for taxon in taxa for window_name in time_windows] + [f'{taxon}_rolling_var_{window_name}' for taxon in taxa for window_name in time_windows] + [f'{feature}_rolling_mean_{window_name}' for feature in meteo_features for window_name in time_windows] + [f'{feature}_rolling_var_{window_name}' for feature in meteo_features for window_name in time_windows]
 
 #Random Forests training and tuning
 #Training a RF for each pollen type
@@ -109,7 +116,7 @@ for taxon in taxa:
     feature_importances = best_rf.feature_importances_
     sns.barplot(x=feature_importances, y=features)
     plt.title(f"Feature Importance for {taxon}")
-    plt.show()
+    plt.savefig(f'{plots_dir}/{taxon}_feature_importance')
 
     #Results visualization
     plt.figure(figsize=(10, 6))
@@ -118,12 +125,12 @@ for taxon in taxa:
     plt.xlabel("Actual Rolling Mean of Concentration")
     plt.ylabel("Predicted Rolling Mean of Concentration")
     plt.title(f"Predicted vs Actual for {taxon}")
-    plt.show()
+    plt.savefig(f'{plots_dir}/{taxon}_predicted_vs_actual')
 
     fig, ax = plt.subplots(1, figsize=(10,6))
     ax.plot(test_data['datetime'], y_test, color='green', label='Actual')
     ax.plot(test_data['datetime'], y_pred, color='red', label='Predicted')
     ax.grid()
     fig.legend()
-    plt.show()
+    plt.savefig(f'{plots_dir}/{taxon}_results')
     plt.close(fig)
