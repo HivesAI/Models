@@ -78,7 +78,7 @@ for feature in taxa + meteo_features:
             new_features[f'{feature}_rolling_var_{window_name}_delta_{i}w'] = new_features[f'{feature}_rolling_var_{window_name}'] - new_features[f'{feature}_rolling_var_{window_name}'].shift(i)
 
 
-
+all_features = new_features.copy()
 new_features_df = pd.DataFrame(new_features)
 
 data = pd.concat([data, new_features_df], axis=1)
@@ -86,16 +86,22 @@ data = pd.concat([data, new_features_df], axis=1)
 # Dropping possible existing rows with NaN values created by shifts and rolling sums
 data.dropna(inplace=True)
 
-res_file = open('results-single-gpu.txt', 'w')
 
-
-SPLIT_YEAR = 2018
+SPLIT_YEAR = 2015
 END_YEAR = 2020
 
-# Random Forests training and tuning
-# Training a RF for each pollen type
+res_file = open('results-gpu.txt', 'w')
+res_file.write(f'Training years <= {SPLIT_YEAR} < Validation years <= {END_YEAR}\n')
+
+# ALL_TAXA = True
+# if ALL_TAXA:
+#     print("All Taxa features")
+# else:
+#     print("Single taxon features")
+
 for taxon in taxa:
-    # Defining the final feature set to use
+    print(f"Training for {taxon}")
+
     features = ['temp_max', 'temp_min', 'temp_mean', 'rain', 'humidity', 'wind_dir', 'wind_speed', 'wind_gusts', 'rad', 'sun_hours', 'pressure'] + [f'{taxon}_rolling_mean_{window_name}' for window_name in time_windows] + [f'{taxon}_rolling_var_{window_name}' for window_name in time_windows] + [f'{feature}_rolling_mean_{window_name}' for feature in meteo_features for window_name in time_windows] + [f'{feature}_rolling_var_{window_name}' for feature in meteo_features for window_name in time_windows]
 
     features += [f'{taxon}_rolling_mean_{window_name}_delta' for window_name in time_windows] + [f'{taxon}_rolling_var_{window_name}_delta' for window_name in time_windows]
@@ -104,11 +110,11 @@ for taxon in taxa:
         features += [f'{taxon}_rolling_mean_{window_name}_delta_{i}w' for window_name in time_windows] + [f'{taxon}_rolling_var_{window_name}_delta_{i}w' for window_name in time_windows]
 
 
+    # TODO: understand if this is actually correct
     # Target feature -> rolling mean for the next time window (CHANGE VALUES BELOW TO CHANGE TIME WINDOW)
     tw_name = '1w' # PREDICTING ONE WEEK AHEAD
     tw_size = 7
 
-    # center=False means that the center is the rightmost element of the window
     data[f'{taxon}_target_{tw_name}'] = (data[taxon].shift(-tw_size).rolling(window=tw_size, min_periods=1, center=False, closed='right').mean())
 
     # Ensuring time series consistency for the splits by filtering dates
@@ -116,11 +122,9 @@ for taxon in taxa:
     test_data = data[(data['year'] > SPLIT_YEAR) & (data['year'] <= END_YEAR)] # Testing on 2016-2020 data
 
 
-    # Initializing TimeSeriesSplit, keeping consistent splits
-    tscv = TimeSeriesSplit(n_splits=5)
-
     # cuML
 
+    tscv = TimeSeriesSplit(n_splits=8)
     from sklearn.preprocessing import StandardScaler
     scaler = StandardScaler()
 
@@ -151,8 +155,8 @@ for taxon in taxa:
     }
 
     param_grid = {
-        'max_depth': [10],
-        'n_bins': [256],
+        'max_depth': [12],
+        'n_bins': [512],
     }
 
     rf = cuml_rf.RandomForestRegressor(**params)
