@@ -43,8 +43,6 @@ time_windows = {
     '6m': 180
 }
 
-SPLIT_YEAR = 2018
-END_YEAR = 2020
 
 # Replace all '--' occurrences with previous day values
 data.replace('--', np.nan, inplace=True)
@@ -75,8 +73,10 @@ for feature in taxa + meteo_features:
         new_features[f'{feature}_rolling_mean_{window_name}_delta'] = new_features[f'{feature}_rolling_mean_{window_name}'] - new_features[f'{feature}_rolling_mean_{window_name}'].shift(window_size)
         new_features[f'{feature}_rolling_var_{window_name}_delta'] = new_features[f'{feature}_rolling_var_{window_name}'] - new_features[f'{feature}_rolling_var_{window_name}'].shift(window_size)
 
-        new_features[f'{feature}_rolling_mean_delta_4w'] = new_features[f'{feature}_rolling_mean_1w'] - new_features[f'{feature}_rolling_mean_1w'].shift(4)
-        new_features[f'{feature}_rolling_var_delta_4w'] = new_features[f'{feature}_rolling_var_1w'] - new_features[f'{feature}_rolling_var_1w'].shift(4)
+        for i in range(1, 6):
+            new_features[f'{feature}_rolling_mean_{window_name}_delta_{i}w'] = new_features[f'{feature}_rolling_mean_{window_name}'] - new_features[f'{feature}_rolling_mean_{window_name}'].shift(i)
+            new_features[f'{feature}_rolling_var_{window_name}_delta_{i}w'] = new_features[f'{feature}_rolling_var_{window_name}'] - new_features[f'{feature}_rolling_var_{window_name}'].shift(i)
+
 
 
 new_features_df = pd.DataFrame(new_features)
@@ -86,8 +86,11 @@ data = pd.concat([data, new_features_df], axis=1)
 # Dropping possible existing rows with NaN values created by shifts and rolling sums
 data.dropna(inplace=True)
 
-res_file = open('results.txt', 'a')
+res_file = open('results-single-gpu.txt', 'w')
 
+
+SPLIT_YEAR = 2018
+END_YEAR = 2020
 
 # Random Forests training and tuning
 # Training a RF for each pollen type
@@ -97,7 +100,8 @@ for taxon in taxa:
 
     features += [f'{taxon}_rolling_mean_{window_name}_delta' for window_name in time_windows] + [f'{taxon}_rolling_var_{window_name}_delta' for window_name in time_windows]
 
-    features += [f'{taxon}_rolling_mean_delta_4w', f'{taxon}_rolling_var_delta_4w']
+    for i in range(1, 6):
+        features += [f'{taxon}_rolling_mean_{window_name}_delta_{i}w' for window_name in time_windows] + [f'{taxon}_rolling_var_{window_name}_delta_{i}w' for window_name in time_windows]
 
 
     # Target feature -> rolling mean for the next time window (CHANGE VALUES BELOW TO CHANGE TIME WINDOW)
@@ -167,7 +171,7 @@ for taxon in taxa:
     print(f"Tuned Mean Squared Error: {mse:.4f}\n") # Lower is better; Average squared difference between predicted and actual values
 
     res_file.write(f"Taxon: {taxon}\n")
-    res_file.write(f"R²: {r2:.4f}\n")
+    res_file.write(f"R2: {r2:.4f}\n")
     res_file.write(f"MSE: {mse:.4f}\n\n")
 
 
