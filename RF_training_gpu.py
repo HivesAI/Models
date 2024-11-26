@@ -124,7 +124,7 @@ for taxon in taxa:
 
     # cuML
 
-    tscv = TimeSeriesSplit(n_splits=8)
+    tscv = TimeSeriesSplit(n_splits=5)
     from sklearn.preprocessing import StandardScaler
     scaler = StandardScaler()
 

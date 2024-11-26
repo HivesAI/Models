@@ -1,0 +1,41 @@
+Training years <= 2015 < Validation years <= 2020
+Taxon: Ambrosia
+R2: 0.3851
+MSE: 0.1022
+
+Taxon: Artemisia
+R2: 0.5180
+MSE: 128.3275
+
+Taxon: Betula
+R2: 0.5967
+MSE: 400.1022
+
+Taxon: Corylus
+R2: 0.7112
+MSE: 87.1349
+
+Taxon: Cupressaceae, Taxaceae
+R2: 0.6459
+MSE: 843.8798
+
+Taxon: Fraxinus
+R2: 0.4071
+MSE: 3928.4009
+
+Taxon: Olea europaea
+R2: 0.6238
+MSE: 3.7569
+
+Taxon: Ostrya carpinifolia
+R2: 0.5829
+MSE: 33531.2818
+
+Taxon: Poaceae
+R2: 0.6038
+MSE: 359.6795
+
+Taxon: Urticaceae
+R2: 0.7927
+MSE: 924.8484
+
