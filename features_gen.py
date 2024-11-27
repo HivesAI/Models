@@ -11,6 +11,11 @@ taxa = [
 ]
 
 
+def days_convolution(num_days):
+    kernel = np.ones(num_days) / num_days
+    return kernel
+
+
 def get_features(taxa: list[str] = taxa):
 
     # Loading data
@@ -78,10 +83,10 @@ def get_features(taxa: list[str] = taxa):
                 # TODO: find new meteo features to add
                 pass
 
-    for t in taxa:
-        kernel = np.array([1/7, 1/7, 1/7, 1/7, 1/7, 1/7, 1/7])
-        features_data[f'{t}_convolution'] = np.convolve(
-            data[t], kernel, mode="same")
+    for i in range(7, 48):
+        for t in taxa:
+            features_data[f'{t}_convolution_{i}_days'] = np.convolve(
+                data[t], days_convolution(i), mode="same")
 
     def gaussian_kernel(size, sigma):
         x = np.arange(-size, size+1)
@@ -89,13 +94,13 @@ def get_features(taxa: list[str] = taxa):
         return kernel / kernel.sum()
 
     # Parametri del kernel
-    size = 3  # Raggio del kernel
-    sigma = 1.0
+    # size = 3  # Raggio del kernel
+    # sigma = 1.0
 
-    for t in taxa:
-        kernel = gaussian_kernel(size, sigma)
-        features_data[f'{t}_convolution'] = np.convolve(
-            data[t], kernel, mode="same")
+    # for t in taxa:
+    #    kernel = gaussian_kernel(size, sigma)
+    #    features_data[f'{t}_convolution'] = np.convolve(
+    #        data[t], kernel, mode="same")
 
     final_features_df = pd.DataFrame(features_data)
     data = pd.concat([data, final_features_df], axis=1)
