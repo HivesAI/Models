@@ -18,7 +18,8 @@ SPLIT_YEAR = 2015
 END_YEAR = 2020
 
 res_file = open('results-gpu.txt', 'w')
-res_file.write(f'Training years <= {SPLIT_YEAR} < Validation years <= {END_YEAR}\n')
+res_file.write(f'Training years <= {
+               SPLIT_YEAR} < Validation years <= {END_YEAR}\n')
 
 # ALL_TAXA = True
 # if ALL_TAXA:
@@ -39,15 +40,17 @@ for taxon in taxa:
 
     # TODO: understand if this is actually correct
     # Target feature -> rolling mean for the next time window (CHANGE VALUES BELOW TO CHANGE TIME WINDOW)
-    tw_name = '1w' # PREDICTING ONE WEEK AHEAD
+    tw_name = '1w'  # PREDICTING ONE WEEK AHEAD
     tw_size = 7
 
-    data[f'{taxon}_target_{tw_name}'] = (data[taxon].shift(-tw_size).rolling(window=tw_size, min_periods=1, center=False, closed='right').mean())
+    data[f'{taxon}_target_{tw_name}'] = (data[taxon].shift(-tw_size).rolling(
+        window=tw_size, min_periods=1, center=False, closed='right').mean())
 
     # Ensuring time series consistency for the splits by filtering dates
-    train_data = data[data['year'] <= SPLIT_YEAR] # Training on data up to 2015
-    test_data = data[(data['year'] > SPLIT_YEAR) & (data['year'] <= END_YEAR)] # Testing on 2016-2020 data
-
+    # Training on data up to 2015
+    train_data = data[data['year'] <= SPLIT_YEAR]
+    test_data = data[(data['year'] > SPLIT_YEAR) & (
+        data['year'] <= END_YEAR)]  # Testing on 2016-2020 data
 
     # cuML
 
@@ -87,31 +90,31 @@ for taxon in taxa:
     }
 
     rf = cuml_rf.RandomForestRegressor(**params)
-    rf_random = GridSearchCV(estimator=rf, param_grid=param_grid, cv=tscv, n_jobs=-1)
+    rf_random = GridSearchCV(
+        estimator=rf, param_grid=param_grid, cv=tscv, n_jobs=-1)
     rf_random.fit(X_train, y_train)
     best_rf = rf_random.best_estimator_
     # for tree in rf.estimators_:
     #     tmp_pred = tree.predict(X_test)
 
-
     y_pred = best_rf.predict(X_test)
     r2 = r2_score(y_test, y_pred)
     mse = mean_squared_error(y_test, y_pred)
     print(f"Taxon: {taxon}")
-    print(f"Tuned R² Score: {r2:.4f}") # Higher is better; measure of how well the model explains variance in the test data
-    print(f"Tuned Mean Squared Error: {mse:.4f}\n") # Lower is better; Average squared difference between predicted and actual values
+    # Higher is better; measure of how well the model explains variance in the test data
+    print(f"Tuned R² Score: {r2:.4f}")
+    # Lower is better; Average squared difference between predicted and actual values
+    print(f"Tuned Mean Squared Error: {mse:.4f}\n")
 
     res_file.write(f"Taxon: {taxon}\n")
     res_file.write(f"R2: {r2:.4f}\n")
     res_file.write(f"MSE: {mse:.4f}\n\n")
-
 
     # Showing each feature importance for future feature tuning/adjustments
     # feature_importances = best_rf.feature_importances_
     # sns.barplot(x=feature_importances, y=features)
     # plt.title(f"Feature Importance for {taxon}")
     # plt.savefig(f'./plots/{taxon}_{tw_name}_fi.png')
-
 
     # Instead of plotting the values for each day, plot the values for each week, where the value is the mean of the week
     # This is done to make the plot more readable
@@ -122,22 +125,23 @@ for taxon in taxa:
         weekly_y_test.append(y_test[i:i+7].mean())
         weekly_y_pred.append(y_pred[i:i+7].mean())
 
-
-    fig, ax = plt.subplots(1, figsize=(10,6))
+    fig, ax = plt.subplots(1, figsize=(10, 6))
 
     fig.suptitle(f'{taxon} - Predicted vs Actual for {tw_name}', fontsize=16)
 
-    ax.plot(test_data['datetime'].iloc[::7], weekly_y_test, color='green', label='Actual')
-    ax.fill_between(test_data['datetime'].iloc[::7], weekly_y_test, color='green', alpha=0.3)
-    ax.plot(test_data['datetime'].iloc[::7], weekly_y_pred, color='red', label='Predicted')
-    ax.fill_between(test_data['datetime'].iloc[::7], weekly_y_pred, color='red', alpha=0.3)
+    ax.plot(test_data['datetime'].iloc[::7],
+            weekly_y_test, color='green', label='Actual')
+    ax.fill_between(test_data['datetime'].iloc[::7],
+                    weekly_y_test, color='green', alpha=0.3)
+    ax.plot(test_data['datetime'].iloc[::7],
+            weekly_y_pred, color='red', label='Predicted')
+    ax.fill_between(test_data['datetime'].iloc[::7],
+                    weekly_y_pred, color='red', alpha=0.3)
 
     ax.grid()
     fig.legend()
     plt.savefig(f'./plots/{taxon}_{tw_name}_pred.png')
     plt.close(fig)
-
-
 
 
 res_file.close()
