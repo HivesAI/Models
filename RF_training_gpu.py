@@ -11,80 +11,7 @@ from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 from sklearn.metrics import r2_score, mean_squared_error
 import seaborn as sns
 import cuml.ensemble.randomforestregressor as cuml_rf
-
-# Data path
-data_path = './data/Full_data_Trentino.csv'
-
-# Loading data
-data = pd.read_csv(data_path)
-data['datetime'] = pd.to_datetime(data['datetime'])
-
-data['year'] = data['datetime'].dt.year
-data['month'] = data['datetime'].dt.month
-data['day'] = data['datetime'].dt.dayofyear
-
-# Taxa concentrations
-taxa = [
-    'Ambrosia', 'Artemisia', 'Betula', 'Corylus', 'Cupressaceae, Taxaceae',
-    'Fraxinus', 'Olea europaea', 'Ostrya carpinifolia', 'Poaceae', 'Urticaceae'
-]
-
-# Meteorological features
-meteo_features = ['temp_max', 'temp_min', 'temp_mean', 'rain', 'humidity', 'wind_dir', 'wind_speed', 'wind_gusts', 'rad', 'sun_hours', 'pressure']
-
-# Defining new input Features
-
-# Defining the different time windows (1/2 weeks, 1/3/6 months)
-time_windows = {
-    '1w': 7,
-    '2w': 14,
-    '1m': 30,
-    '3m': 90,
-    '6m': 180
-}
-
-
-# Replace all '--' occurrences with previous day values
-data.replace('--', np.nan, inplace=True)
-data.replace('', np.nan, inplace=True)
-data.replace(' ', np.nan, inplace=True)
-data.ffill(inplace=True)
-
-# change all columns to float except datetime
-for column in data.columns:
-    if column not in ['datetime']:
-        data[column] = data[column].astype('float32')
-
-# Fill empty values with the previous day values
-
-# Creating rolling mean and variance features for each feature in the given time windows
-new_features = {}
-
-for feature in taxa + meteo_features:
-    for window_name, window_size in time_windows.items():
-        # Rolling mean
-        new_features[f'{feature}_rolling_mean_{window_name}'] = data[feature].rolling(window=window_size, min_periods=1).mean()
-        # Rolling variance
-        new_features[f'{feature}_rolling_var_{window_name}'] = data[feature].rolling(window=window_size, min_periods=1).var()
-
-
-for feature in taxa + meteo_features:
-    for window_name, window_size in time_windows.items():
-        new_features[f'{feature}_rolling_mean_{window_name}_delta'] = new_features[f'{feature}_rolling_mean_{window_name}'] - new_features[f'{feature}_rolling_mean_{window_name}'].shift(window_size)
-        new_features[f'{feature}_rolling_var_{window_name}_delta'] = new_features[f'{feature}_rolling_var_{window_name}'] - new_features[f'{feature}_rolling_var_{window_name}'].shift(window_size)
-
-        for i in range(1, 6):
-            new_features[f'{feature}_rolling_mean_{window_name}_delta_{i}w'] = new_features[f'{feature}_rolling_mean_{window_name}'] - new_features[f'{feature}_rolling_mean_{window_name}'].shift(i)
-            new_features[f'{feature}_rolling_var_{window_name}_delta_{i}w'] = new_features[f'{feature}_rolling_var_{window_name}'] - new_features[f'{feature}_rolling_var_{window_name}'].shift(i)
-
-
-all_features = new_features.copy()
-new_features_df = pd.DataFrame(new_features)
-
-data = pd.concat([data, new_features_df], axis=1)
-
-# Dropping possible existing rows with NaN values created by shifts and rolling sums
-data.dropna(inplace=True)
+import features_gen as fg
 
 
 SPLIT_YEAR = 2015
@@ -99,16 +26,16 @@ res_file.write(f'Training years <= {SPLIT_YEAR} < Validation years <= {END_YEAR}
 # else:
 #     print("Single taxon features")
 
+taxa = [
+    'Ambrosia', 'Artemisia', 'Betula', 'Corylus', 'Cupressaceae, Taxaceae',
+    'Fraxinus', 'Olea europaea', 'Ostrya carpinifolia', 'Poaceae', 'Urticaceae'
+]
+
 for taxon in taxa:
     print(f"Training for {taxon}")
 
-    features = ['temp_max', 'temp_min', 'temp_mean', 'rain', 'humidity', 'wind_dir', 'wind_speed', 'wind_gusts', 'rad', 'sun_hours', 'pressure'] + [f'{taxon}_rolling_mean_{window_name}' for window_name in time_windows] + [f'{taxon}_rolling_var_{window_name}' for window_name in time_windows] + [f'{feature}_rolling_mean_{window_name}' for feature in meteo_features for window_name in time_windows] + [f'{feature}_rolling_var_{window_name}' for feature in meteo_features for window_name in time_windows]
-
-    features += [f'{taxon}_rolling_mean_{window_name}_delta' for window_name in time_windows] + [f'{taxon}_rolling_var_{window_name}_delta' for window_name in time_windows]
-
-    for i in range(1, 6):
-        features += [f'{taxon}_rolling_mean_{window_name}_delta_{i}w' for window_name in time_windows] + [f'{taxon}_rolling_var_{window_name}_delta_{i}w' for window_name in time_windows]
-
+    data, features = fg.get_features([taxon])
+    print(f'Features={len(features)}\n')
 
     # TODO: understand if this is actually correct
     # Target feature -> rolling mean for the next time window (CHANGE VALUES BELOW TO CHANGE TIME WINDOW)
