@@ -1,0 +1,6 @@
+Training years <= 2010 < Validation years <= 2020
+Taxon: Ambrosia
+Method: XGBoost
+R2: 0.0543
+MSE: 0.3828
+
